@@ -1,0 +1,23 @@
+{
+  "name": "the-art-of-download",
+  "version": "1.0.0",
+  "description": "the art of download",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xzela/the-art-of-download.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xzela/the-art-of-download/issues"
+  },
+  "homepage": "https://github.com/xzela/the-art-of-download#readme",
+  "dependencies": {
+    "nopt": "^3.0.6",
+    "request": "^2.74.0"
+  }
+}
