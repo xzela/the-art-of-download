@@ -18,6 +18,7 @@
   "homepage": "https://github.com/xzela/the-art-of-download#readme",
   "dependencies": {
     "nopt": "^3.0.6",
+    "progress": "^1.1.8",
     "request": "^2.74.0"
   }
 }
