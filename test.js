@@ -4,10 +4,17 @@ var cluster = require('cluster'),
 	http = require('http'),
 	nopt = require("nopt"),
 	ProgressBar = require('progress'),
+	Writable = require('stream').Writable,
 	fs = require('fs'),
 	cpus = require('os').cpus();
 
-var dates = ['2009-05-05a.zip', '2009-05-07a.zip', '2009-05-08a.zip', '2009-05-09a.zip'];
+var dates = ['2016-07-15a.zip',
+			'2009-05-07.zip',
+			'2015-03-13.zip',
+			'2015-03-04.zip',
+			'2015-01-30.zip',
+			'2014-12-25.zip',
+			'2014-11-21.zip'];
 
 if (cluster.isMaster) {
 	// Fork workers.
@@ -16,134 +23,73 @@ if (cluster.isMaster) {
 	}
 
 	cluster.on('online', (worker) => {
-		console.log('online worker', worker.id);
+		console.log(`${worker.id} is online!`);
 	});
 
-	cluster.on('listening', (address) => {
-		console.log(address);
-	});
+	cluster.on('message', (worker, msg) => {
+		if (dates.length <= 0) {
+			console.log(`worker: ${worker.id} has nothing to do!`);
+			worker.disconnect();
+			return;
+		}
+		console.log('date length is:', dates.length, msg);
+		var file = dates.pop();
+		var uri = '/content/' + file;
+		var options = {
+			protocol: 'http:',
+			// @TODO auth here!
+			method: 'GET',
+			host: 'theartofblowjob.com',
+			path: uri,
+		};
 
-	cluster.on('exit', function (worker, code, signal) {
-		console.log('worker ', worker.process.pid, 'died:', signal);
-	});
-
-	cluster.on('message', (msg) => {
-		var worker = cluster.worker;
-		if (msg === 'download') {
-			var uri = 'content/' + dates[worker.id - 1];
-			var options = {
-				protocol: 'http:',
-				// @ TODO auth
-				method: 'GET',
-				host: 'theartofblowjob.com',
-				path: uri,
+		var callback = function (response) {
+			if (response.statusCode !== 200) {
+				// console.log('file not found', uri);
+				worker.disconnect();
+				return;
+			}
+			var len = parseInt(response.headers['content-length'], 10);
+			var cur = 0;
+			console.log(`${worker.id} downloading file ${file}`);
+			var opts = {
+				flags: 'w',
+				efaultEncoding: 'binary'
 			};
-			// console.log('worker request options:', options);
-			http.request(options, (res) => {
-				console.log(worker.id, res.statusCode, uri);
+			var dest = fs.createWriteStream('./downloads/' + file, opts);
+
+			response.on('data', (chunk) => {
+				if (!chunk) {
+					return;
+				}
+				dest.write(chunk);
+				cur += chunk.length;
+				var percent = Math.round(100 * cur / len);
+				if (percent % 10 === 0) {
+					console.log(worker.id, file, percent);
+				}
+			});
+
+			response.on('end', () => {
 				worker.disconnect();
 			});
+
+			dest.on('end', () => {
+				// worker.send({message: 'try again'});
+			});
+		};
+		http.get(options, callback);
+	});
+
+	cluster.on('exit', (dead) => {
+		console.log(`${dead.id} has died`);
+		if (dates.length > 0) {
+			console.log(`more work to do spinning up new worker....`);
+			var worker = cluster.fork();
+			console.log(`${worker.id} has been born`);
 		}
 	});
 
 } else {
-
-	process.send('download');
-	// Workers can share any TCP connection
-	// http.createServer((req, res) => {
-	// 	console.log(uris[cluster.worker.id - 1]);
-	// 	res.writeHead(200);
-	// 	res.end('hello world\n');
-	// }).listen(8001);
+	process.send({message: 'download'});
 }
-
-// var uri = "http://dhKSFJ3Y:P5UXJ6A@theartofblowjob.com/content/";
-// var files = dates.map((d) => {
-// 	return uri.toString() + `${d}.zip`;
-// });
-
-
-// http://:@theartofblowjob.com/content/2007-05-21.zip
-// var date = '2009-05-07';
-// var uri = "http://dhKSFJ3Y:P5UXJ6A@theartofblowjob.com/content/" + date + '.zip';
-// var known = {
-// 		'username': String,
-// 		'password': String
-// 	},
-// 	short = {
-// 		'u': ['--username'],
-// 		'p': ['--password']
-// 	};
-// var parsed = nopt(known, short, process.argv, 2);
-// // console.log(parsed);
-//
-// // process.exit();
-//
-// // request.get(url + '/content/' + date + '.zip').pipe(fs.createWriteStream('./downloads/' + date + '.zip'));
-// var req = http.get(uri, function (response) {
-// 	var len = parseInt(response.headers['content-length'], 10);
-// 	var bar = new ProgressBar('  downloading [:bar] :percent :etas', {
-// 		complete: '=',
-// 		incomplete: ' ',
-// 		width: 20,
-// 		total: len
-// 	});
-//
-// 	var body = "";
-// 	var cur = 0;
-//
-// 	response.on('data', function (chunk) {
-// 		bar.tick(chunk.length);
-// 	});
-//
-// 	response.on('data2', function (chunk) {
-// 		body += chunk;
-// 		cur += chunk.length;
-// 		var percent = (100 * cur / len).toFixed(2);
-// 		console.log(percent);
-// 		if (percent % 20 === 0) {
-// 			console.log('20 precent more ');
-// 		}
-// 	});
-//
-// 	response.on('end', function () {
-// 		fs.writeFile('./downloads/' + date + '.zip', body, {}, function () {
-// 			console.log('done!');
-// 		});
-// 	});
-//
-// 	req.on('error', function (err) {
-// 		console.error(err);
-// 	});
-// });
-//
-//
-//
-// function download(url, callback, encoding){
-// 		var request = http.get(url, function(response) {
-// 			if (encoding){
-// 				response.setEncoding(encoding);
-// 			}
-// 			var len = parseInt(response.headers['content-length'], 10);
-// 			var body = "";
-// 			var cur = 0;
-// 			var obj = document.getElementById('js-progress');
-// 			var total = len / 1048576; //1048576 - bytes in  1Megabyte
-//
-// 			response.on("data", function(chunk) {
-// 				body += chunk;
-// 				cur += chunk.length;
-// 				obj.innerHTML = "Downloading " + (100.0 * cur / len).toFixed(2) + "% " + (cur / 1048576).toFixed(2) + " mb\r" + ".<br/> Total size: " + total.toFixed(2) + " mb";
-// 			});
-//
-// 			response.on("end", function() {
-// 				callback(body);
-// 				obj.innerHTML = "Downloading complete";
-// 			});
-//
-// 			request.on("error", function(e){
-// 				console.log("Error: " + e.message);
-// 			});
-//
-// 		});
-// 	};
